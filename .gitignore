@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+
+# Model caches
+~/.cache/huggingface/
+~/.EasyOCR/
+
+# Video/audio output directories (generated per-video)
+# These are per-run outputs, not source code
+*.wav
+*.mkv
+*.mp4
+*.avi
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output artifacts from pipeline runs
+*/audio.wav
+*/frames/
+*/transcript.json
+*/paddleocr_results.json
+*/vlm_results.json
+*/ocr_results.json
+*/output.vtt
