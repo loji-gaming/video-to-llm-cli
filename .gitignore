@@ -3,12 +3,16 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 dist/
 build/
 
 # Virtual environments
 .venv/
 venv/
+.deps/
 
 # Model caches
 ~/.cache/huggingface/
@@ -32,6 +36,9 @@ venv/
 Thumbs.db
 
 # Output artifacts from pipeline runs
+outputs/
+*.video_to_llm/
+devlog-*.md
 */audio.wav
 */frames/
 */transcript.json
