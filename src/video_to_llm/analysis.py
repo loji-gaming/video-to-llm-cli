@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 
+from .events import detect_visual_events, write_events
 from .features import FrameVector, frame_to_vector, is_useful_frame
 from .ocr import extract_text
 from .outputs import (
@@ -69,6 +70,14 @@ def run_analysis(
     ocr_mode: str = "none",
     save_embeddings: bool = True,
     include_segment_keyframes: bool = True,
+    detect_events: bool = False,
+    event_window_seconds: float = 1.5,
+    event_threshold_percentile: float = 95.0,
+    event_min_distance: float = 0.2,
+    event_merge_gap_seconds: float = 0.35,
+    max_events: int = 24,
+    event_max_frames: int = 120,
+    event_clips: bool = True,
 ) -> AnalysisResult:
     if not input_path.exists():
         raise FileNotFoundError(input_path)
@@ -107,6 +116,25 @@ def run_analysis(
     artifacts: dict[str, str] = {}
     if save_embeddings:
         artifacts["embeddings"] = write_embeddings(out, vectors)
+    if detect_events:
+        events = detect_visual_events(
+            vectors,
+            metadata.duration,
+            window_seconds=event_window_seconds,
+            threshold_percentile=event_threshold_percentile,
+            min_distance=event_min_distance,
+            merge_gap_seconds=event_merge_gap_seconds,
+            max_events=max_events,
+        )
+        if events:
+            artifacts["events_jsonl"] = write_events(
+                out,
+                input_path,
+                vectors,
+                events,
+                max_frames_per_event=event_max_frames,
+                write_clips=event_clips,
+            )
     artifacts["segments_jsonl"] = write_segments_jsonl(out, segments)
     artifacts["timeline_markdown"] = write_timeline_markdown(out, metadata, detail, segments)
     artifacts["video_json"] = "video.json"

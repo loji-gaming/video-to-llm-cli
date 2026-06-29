@@ -34,3 +34,5 @@ def test_cli_help_llm() -> None:
     assert payload["program"] == "video-to-llm"
     assert "analyze" in payload["commands"]
     assert "stream" in payload["commands"]
+    analyze_options = payload["commands"]["analyze"]["options"]
+    assert any(option["flag"] == "--detect-events" for option in analyze_options)

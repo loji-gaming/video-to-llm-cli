@@ -10,12 +10,13 @@ being written by a capture process.
 
 ## Status
 
-Version 0.1 is a practical local-first pipeline:
+Version 0.2 is a practical local-first pipeline:
 
 - Samples a video according to `--detail`
 - Builds a compact vector for each sampled frame
 - Collapses visually similar stretches into timeline segments
 - Selects diverse keyframes with Euclidean farthest-point selection
+- Detects high-change visual event windows and writes event evidence on request
 - Writes structured artifacts for LLM ingestion
 - Optionally runs local Tesseract OCR on keyframes
 - Experimentally watches a growing video file and emits JSONL events
@@ -59,6 +60,7 @@ tesseract
 video-to-llm --help
 video-to-llm --help-llm
 video-to-llm analyze recording.mp4 --detail medium --out ./recording_context
+video-to-llm analyze recording.mp4 --detail high --detect-events --out ./recording_context_events
 ```
 
 Artifacts:
@@ -73,6 +75,13 @@ recording_context/
     ...
   embeddings/
     frame_features.npz
+  events.jsonl
+  events/
+    event_0001_visual_burst_...
+      event.json
+      clip.mp4
+      contact_sheet.jpg
+      frames/
 ```
 
 ## Commands
@@ -110,9 +119,50 @@ Useful options:
 --sample-interval 1.0
 --min-gap 4
 --ocr tesseract
+--detect-events
+--event-window 1.5
+--event-threshold-percentile 95
+--event-min-distance 0.2
+--event-merge-gap 0.35
+--event-max-frames 120
 --stdout
 --no-embeddings
 ```
+
+### Detect Visual Events
+
+Use event detection for short, important changes such as VFX impacts,
+explosions, shield hits, UI transitions, cuts, menu opens, or other moments that
+need frame-by-frame evidence.
+
+```bash
+video-to-llm analyze input.mp4 \
+  --detail exhaustive \
+  --sample-interval 0.02 \
+  --detect-events \
+  --event-window 1.5 \
+  --event-max-frames 120 \
+  --out ./context_events
+```
+
+Event outputs:
+
+```text
+context_events/
+  events.jsonl
+  events/
+    event_0001_visual_burst_00-05-750_00-07-150/
+      event.json
+      clip.mp4
+      contact_sheet.jpg
+      frames/
+        frame_0001_00-05-750.jpg
+        ...
+```
+
+Use `events.jsonl` first, then inspect the event contact sheet and clip for
+visual evidence. Increase `--event-max-frames` when an event needs denser
+frame-by-frame review.
 
 ### Extract Representative Frames
 
@@ -165,9 +215,10 @@ and image calls are slow and expensive.
 Recommended flow:
 
 1. Use vectors to segment the whole video.
-2. Use OCR on keyframes or text-changing frames.
-3. Send `video.json`, `segments.jsonl`, and selected keyframes to the LLM.
-4. Ask follow-up questions by retrieving relevant segments and nearby frames.
+2. Use `--detect-events` to isolate brief high-change moments.
+3. Use OCR on keyframes or text-changing frames.
+4. Send `video.json`, `segments.jsonl`, `events.jsonl`, and selected keyframes/contact sheets to the LLM.
+5. Ask follow-up questions by retrieving relevant segments, events, and nearby frames.
 
 For UI-heavy or document-heavy video, OCR should be enabled. For game state and
 visual scenes, selected keyframes should still be available because text-only
@@ -183,6 +234,7 @@ conversion can lose important state.
 - One record per sampled frame
 - One record per visual segment
 - Keyframe file references
+- Event references when `--detect-events` is enabled
 - OCR text when enabled
 
 `segments.jsonl` is optimized for streaming into logs, vector stores, and LLM
