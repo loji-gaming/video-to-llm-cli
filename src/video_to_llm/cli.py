@@ -18,6 +18,7 @@ app = typer.Typer(
     name="video-to-llm",
     help="Convert videos into structured timelines, vectors, OCR text, and representative frames for LLM workflows.",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 
@@ -27,9 +28,115 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+def llm_help_payload() -> dict:
+    detail_profiles = {
+        name: {
+            "sample_interval_seconds": profile.sample_interval,
+            "min_segment_seconds": profile.min_segment_seconds,
+            "target_keyframes": profile.target_keyframes,
+            "boundary_percentile": profile.boundary_percentile,
+        }
+        for name, profile in DETAIL_PROFILES.items()
+    }
+    return {
+        "schema": "video-to-llm/help-v1",
+        "program": "video-to-llm",
+        "version": __version__,
+        "purpose": "Convert video files or growing capture files into LLM-friendly timelines, representative frames, frame vectors, OCR text, and JSONL events.",
+        "global_options": [
+            {"flag": "--help", "alias": "-h", "description": "Show human-oriented CLI help."},
+            {"flag": "--help-llm", "description": "Show this structured LLM-oriented help as JSON."},
+            {"flag": "--version", "description": "Show package version."},
+        ],
+        "detail_profiles": detail_profiles,
+        "commands": {
+            "analyze": {
+                "summary": "Analyze a complete video file and write LLM-friendly artifacts.",
+                "usage": "video-to-llm analyze INPUT_VIDEO --detail medium --out ./context",
+                "arguments": [{"name": "INPUT_VIDEO", "type": "path", "required": True}],
+                "options": [
+                    {"flag": "--out", "alias": "-o", "type": "path", "description": "Output directory."},
+                    {"flag": "--detail", "type": "enum", "values": list(DETAIL_PROFILES), "default": "medium"},
+                    {"flag": "--keyframes", "alias": "-k", "type": "int", "description": "Target number of diverse keyframes."},
+                    {"flag": "--sample-interval", "type": "float", "description": "Override seconds between sampled frames."},
+                    {"flag": "--min-gap", "type": "float", "description": "Minimum seconds between selected keyframes."},
+                    {"flag": "--ocr", "type": "enum", "values": sorted(OCR_MODES), "default": "none"},
+                    {"flag": "--no-embeddings", "type": "bool", "description": "Skip compressed frame feature vectors."},
+                    {"flag": "--stdout", "type": "bool", "description": "Emit compact JSON summary to stdout."},
+                ],
+                "outputs": ["video.json", "segments.jsonl", "timeline.md", "frames/*.jpg", "embeddings/frame_features.npz"],
+            },
+            "frames": {
+                "summary": "Extract a requested number of representative screenshots.",
+                "usage": "video-to-llm frames INPUT_VIDEO --count 20 --out ./frames_context",
+                "arguments": [{"name": "INPUT_VIDEO", "type": "path", "required": True}],
+                "options": [
+                    {"flag": "--out", "alias": "-o", "type": "path", "description": "Output directory."},
+                    {"flag": "--count", "alias": "-n", "type": "int", "default": 20},
+                    {"flag": "--detail", "type": "enum", "values": list(DETAIL_PROFILES), "default": "medium"},
+                    {"flag": "--sample-interval", "type": "float", "description": "Override seconds between sampled frames."},
+                    {"flag": "--min-gap", "type": "float", "description": "Minimum seconds between selected keyframes."},
+                    {"flag": "--stdout", "type": "bool", "description": "Emit compact JSON summary to stdout."},
+                ],
+                "outputs": ["video.json", "segments.jsonl", "timeline.md", "frames/*.jpg", "embeddings/frame_features.npz"],
+            },
+            "stream": {
+                "summary": "Experimentally watch a growing video file and emit JSONL frame events.",
+                "usage": "video-to-llm stream CAPTURE_FILE --detail low --out ./stream_context --log ./stream_context/events.jsonl --state ./stream_context/state.json",
+                "arguments": [{"name": "CAPTURE_FILE", "type": "path", "required": True}],
+                "options": [
+                    {"flag": "--out", "alias": "-o", "type": "path", "description": "Optional output directory for boundary keyframes."},
+                    {"flag": "--detail", "type": "enum", "values": list(DETAIL_PROFILES), "default": "low"},
+                    {"flag": "--sample-interval", "type": "float", "description": "Override seconds between observations."},
+                    {"flag": "--poll", "type": "float", "default": 2.0},
+                    {"flag": "--boundary-distance", "type": "float", "default": 0.35},
+                    {"flag": "--safe-lag", "type": "float", "default": 1.0},
+                    {"flag": "--log", "type": "path", "description": "Append JSONL events to this file."},
+                    {"flag": "--state", "type": "path", "description": "Read/write resume state JSON."},
+                    {"flag": "--stop-after", "type": "float", "description": "Stop after seconds; useful for tests or supervised runs."},
+                    {"flag": "--stdout/--no-stdout", "type": "bool", "default": True},
+                ],
+                "event_schema": {
+                    "type": "frame_observation",
+                    "fields": [
+                        "event_id",
+                        "source",
+                        "timestamp",
+                        "available_duration",
+                        "distance_from_previous",
+                        "is_boundary",
+                        "brightness",
+                        "contrast",
+                        "sharpness",
+                        "keyframe_file",
+                    ],
+                },
+            },
+        },
+        "recommended_llm_workflows": [
+            "Use analyze for completed videos; read video.json and segments.jsonl first, then inspect referenced keyframes when visual evidence is needed.",
+            "Use frames when the task only needs a compact screenshot set.",
+            "Use stream for capture files that are still being written; consume JSONL events from stdout or --log.",
+        ],
+    }
+
+
+def help_llm_callback(value: bool) -> None:
+    if value:
+        typer.echo(json.dumps(llm_help_payload(), indent=2, ensure_ascii=False))
+        raise typer.Exit()
+
+
 @app.callback()
 def main(
     version: bool = typer.Option(False, "--version", callback=version_callback, help="Show package version."),
+    help_llm: bool = typer.Option(
+        False,
+        "--help-llm",
+        callback=help_llm_callback,
+        is_eager=True,
+        help="Show structured LLM-oriented help as JSON.",
+    ),
 ) -> None:
     return None
 

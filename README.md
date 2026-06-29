@@ -56,6 +56,8 @@ tesseract
 ## Quick Start
 
 ```bash
+video-to-llm --help
+video-to-llm --help-llm
 video-to-llm analyze recording.mp4 --detail medium --out ./recording_context
 ```
 
@@ -74,6 +76,25 @@ recording_context/
 ```
 
 ## Commands
+
+### Help
+
+Human help:
+
+```bash
+video-to-llm --help
+video-to-llm -h
+video-to-llm analyze --help
+```
+
+Structured help for LLM/tool agents:
+
+```bash
+video-to-llm --help-llm
+```
+
+This prints JSON with command names, options, output artifacts, stream event
+fields, and recommended LLM workflows.
 
 ### Analyze
 
@@ -191,4 +212,3 @@ v2:
 - Real-time capture backends
 - Agent control loop helpers for games and apps
 - Local retrieval server over the generated timeline
-
